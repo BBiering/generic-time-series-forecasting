@@ -1,0 +1,27 @@
+
+Mac Users
+*********
+
+Building the binary x13as requires to have gfortran installed. You have two options:
+
+1. This can be done by installing it with the provided installer gfortran-6.1-ElCapitan.dmg
+2. If you have brew installed, you can simply type: brew install gcc
+
+
+Compile the x13as binary:
+
+1. Open a terminal and go to the x13assrc_V1.1_B26 folder
+2. Run the command: make -f makefile.gfortran
+
+That's it, you should have your executable compiled and ready to use
+
+Tips:
+
+1. You can download the latest version of the binary sources at http://www.census.gov/srd/www/x13as/x13down_unix.html#x13prog
+2. You can download the latest gfortran at http://hpc.sourceforge.net/ or https://gcc.gnu.org/wiki/GFortranBinaries#MacOS
+
+
+Windows Users
+*************
+
+Sorry, you're on your own...
