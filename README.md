@@ -1,4 +1,4 @@
-# eCG Forecasting Project
+# Forecasting Wizard
 
 **What's in the box?**
 
@@ -7,11 +7,7 @@ Python scripts containing different time series forecasting methods. They take a
 Current available methods are:
 * [Seasonal ARIMA](http://www.statsmodels.org/dev/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html#statsmodels.tsa.statespace.sarimax.SARIMAX)
 * [Gaussian Process](http://scikit-learn.org/stable/modules/gaussian_process.html)
-* [Facebook Prophet](https://facebookincubator.github.io/prophet/)
-
-**Who should use these tools?**
-
-Quantitative analysts with rudimentary understanding of time series and regression models. 
+* [Facebook Prophet](https://facebookincubator.github.io/prophet/) 
 
 **Requirements/Limitations**
 
