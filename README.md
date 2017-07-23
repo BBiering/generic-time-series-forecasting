@@ -2,7 +2,7 @@
 
 **What's in the box?**
 
-Three Python scripts containing different time series forecasting methods. They take as input set of time series in a tabular format (EXCEL) and output forecast time series.
+A Python script containing different time series forecasting methods. It takes as input set of time series in a tabular format (EXCEL) and output forecast time series.
 
 Current available methods are:
 * [Seasonal ARIMA](http://www.statsmodels.org/dev/generated/statsmodels.tsa.statespace.sarimax.SARIMAX.html#statsmodels.tsa.statespace.sarimax.SARIMAX)
