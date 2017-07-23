@@ -12,12 +12,12 @@ if __name__ == "__main__":
     output_path = '/data/fcst_data/'
 
     fcst_method = 'sarima'
-    start_date = '2017-07-01'
-    end_date = '2018-12-01'
-    input_file = 'input_file.xlsx'
-    input_file_exog = 'input_file_exog.xlsx'
+    start_date = '2017-03-01'
+    end_date = '2017-12-01'
+    input_file = 'traffic_data_sample.xlsx'
+    input_file_exog = 'traffic_data_sample_exog.xlsx'
     output_file = 'output_file.xlsx'
-    fcst_window = 18
+    fcst_window = 10
 
     # initialize flags and variables
     sarimax_flag = False
