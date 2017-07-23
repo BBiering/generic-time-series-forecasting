@@ -1,120 +1,145 @@
-from sklearn.gaussian_process import GaussianProcess
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), os.pardir)))
+from dateutil import relativedelta
+from datetime import datetime
 from tools.forecasting_tools import *
-from pandas.tseries.offsets import *
-from fbprophet import Prophet
 
-# path parameters
-data_path = '/data/hist_data/'
-fcst_path = '/data/fcst_Data/'
-file_fcst = 'traffic_fcst_sample.xlsx'
-file_raw = 'traffic_data_sample.xlsx'
-sheet_raw = 'raw_data_monthly'
+if __name__ == "__main__":
 
-# forecasting method
-sarimax_flag = True
-gaussian_flag = False
-facebook_flag = False
+    # path parameters following the Git project structure
+    input_path = '/data/hist_data/'
+    output_path = '/data/fcst_data/'
 
-# seasonality and time frame
-seasonality_idx = (12,)  # yearly seasonality assumed
-fcst_window = 6  # number of months to forecast
+    fcst_method = 'sarima'
+    start_date = '2017-07-01'
+    end_date = '2018-12-01'
+    input_file = 'input_file.xlsx'
+    input_file_exog = 'input_file_exog.xlsx'
+    output_file = 'output_file.xlsx'
+    fcst_window = 18
 
-# verbose flag
-verbose = True
+    # initialize flags and variables
+    sarimax_flag = False
+    exog_flag = False
+    gaussian_flag = False
+    facebook_flag = False
+    verbose = False
+    seasonality_idx = (12,)  # yearly seasonality assumed for seasonal ARIMA
 
-# import time series as data frame
-root_path = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
-x13aspath = root_path + '/bin'
-writer = pd.ExcelWriter(root_path + fcst_path + file_fcst,
-                        engine='xlsxwriter')
-data_raw = import_mltpl_timeserie(root_path + data_path + file_raw,
-                                  sheet_name=sheet_raw)
-ts_org = data_raw.index.min()
-te_org = data_raw.index.max()
-res_df = pd.DataFrame()
-data_df = pd.DataFrame()
+    # retrieve command-line arguments (run script via command line)
+    if len(sys.argv) > 1:
+        fcst_method = str(sys.argv[1])
+        start_date = str(sys.argv[2])
+        end_date = str(sys.argv[3])
+        input_file = str(sys.argv[4])
+        output_file = str(sys.argv[5])  # name of the forecast result file
+        fcst_delta = relativedelta.relativedelta(datetime.strptime(end_date, "%Y-%m-%d"),
+                                                 datetime.strptime(start_date, "%Y-%m-%d"))
+        fcst_window = fcst_delta.years*12 + fcst_delta.months + 1
 
-for var in data_raw:
-    # linearly interpolate missing values in data set
-    data_temp = data_raw[var]
-    data_temp.replace(to_replace=0.0, value=np.nan, inplace=True)
-    if data_temp.isnull().values.any():
-        data_temp.interpolate(method='linear', inplace=True)
-        data_temp.fillna(method='bfill', inplace=True)
+    # use if multiple sheets in your input file
+    input_sheet_name = 'Sheet1'
 
-    # SARIMAX model
-    if sarimax_flag is True:
-        try:
-            mdl_order = select_model_order(data_temp,
-                                           x13aspath,
-                                           'MS')
-            ts_fcst = sarimax_model(data_temp,
-                                    seasonality_idx,
-                                    mdl_order,
-                                    fcst_window,
-                                    ts_org,
-                                    te_org,
-                                    verbose)
-            data_df[var] = ts_fcst['Forecast'].tail(fcst_window)
-            print("Forecasting {0} with SARIMAX succeeded".format(var))
-
-        except Exception:
-            print("Forecasting with SARIMAX failed")
-            pass
-
-    # Gaussian Process model
-    elif gaussian_flag is True:
-        composed_df = pd.DataFrame()
-        res_df = pd.DataFrame()
-        res_test = sm.seasonal_decompose(data_temp.dropna(), two_sided=False)
-        composed_df['trend'] = res_test.trend.dropna()
-        composed_df['seasonal'] = res_test.seasonal.dropna()
-        composed_df['residual'] = res_test.resid.dropna()
-        resid_mean = composed_df['residual'].mean()
-        date_rng = pd.date_range(composed_df.index[len(composed_df)-1] + DateOffset(months=1),
-                                 periods=fcst_window,
-                                 freq='MS')
-        res_df['Date'] = pd.to_datetime(date_rng, errors='coerce')
-        res_df = res_df.sort_values(by='Date')
-        res_df = res_df.set_index('Date')
-        res_df['Residual'] = resid_mean
-        seas_rng = list()
-        for i in range(fcst_window):
-            seas_rng.append(res_df.index[i] + DateOffset(months=-(fcst_window + 1)))
-
-        seas_data = composed_df.loc[composed_df.index.isin(seas_rng)]
-        res_df['Seasonal'] = seas_data['seasonal'].values
-
-        # Prediction based on a Gaussian Process
-        X = (composed_df.index - composed_df.index[0]).days.reshape(-1, 1)
-        Y = composed_df['trend'].values
-        X_pred = (res_df.index - composed_df.index[0]).days.reshape(-1, 1)
-        gpr = GaussianProcess(corr='cubic', regr='linear', theta0=1e-2, thetaL=1e-4, thetaU=1e-1,
-                              random_start=100)
-        gpr.fit(X, Y)
-        y_gpr = gpr.predict(X_pred)
-        res_df['Trend'] = y_gpr
-        res_df['Total'] = res_df.sum(axis=1)
-        print("Forecasting {:s} with seasonal decomposition and Gaussian process".format(var))
-        data_df[var] = res_df['Total']
-
-    # Facebook Prophet model
-    elif facebook_flag is True:
-        df_temp = pd.DataFrame()
-        df_temp['ds'] = data_temp.index
-        df_temp['y'] = data_temp.values
-        m = Prophet()
-        m.fit(df_temp)
-        future = m.make_future_dataframe(periods=fcst_window, freq='M')
-        forecast = m.predict(future)
-        data_df[var] = forecast['yhat'].tail(fcst_window).values
-        data_df['Date'] = pd.date_range(start=ts_org + DateOffset(months=1),
-                                        periods=fcst_window,
-                                        freq='MS')
-        data_df = data_df.set_index('Date')
+    # forecasting method
+    if fcst_method == 'sarima':
+        sarimax_flag = True
+        print('Info: Forecasting method is Seasonal ARIMA')
+    elif fcst_method == 'sarimax':
+        sarimax_flag = True
+        exog_flag = True
+        print('Info: Forecasting method is Seasonal ARIMA with Exogenous Regressors')
+    elif fcst_method == 'gaussian':
+        gaussian_flag = True
+        print('Info: Forecasting method is Gaussian Process')
+    elif fcst_method == 'facebook':
+        facebook_flag = True
+        print('Info: Forecasting method is Facebook Prophet')
     else:
-        break
+        print('Error: Forecasting method should be one of sarima, sarimax, gaussian or facebook')
 
-# save forecast to file
-data_df.to_excel(writer, 'fcst_data')
-writer.save()
+    # import time series as data frame
+    root_path = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+    x13aspath = root_path + '/bin'
+    writer = pd.ExcelWriter(root_path +
+                            output_path +
+                            output_file,
+                            engine='xlsxwriter')
+
+    # import input data
+    data_raw = import_mltpl_timeserie(root_path +
+                                      input_path +
+                                      input_file,
+                                      sheet_name=input_sheet_name)
+
+    # import exogenous factors for SARIMAX method
+    if exog_flag is True:
+        data_raw_exog = import_mltpl_timeserie(root_path +
+                                               input_path +
+                                               input_file_exog,
+                                               sheet_name=input_sheet_name)
+    else:
+        data_raw_exog = None
+
+    # initialize data frame variables
+    data_df = pd.DataFrame()
+    data_temp = pd.DataFrame()
+    y_pred = pd.Series()
+
+    # calculate forecast for each data stream
+    for var in data_raw:
+        # interpolate & backfill missing values
+        data_temp = data_raw[var]
+        data_temp.replace(to_replace=0.0, value=np.nan, inplace=True)
+        if data_temp.isnull().values.any():
+            data_temp.interpolate(method='linear', inplace=True)
+            data_temp.fillna(method='bfill', inplace=True)
+
+        # Seasonal ARIMA model
+        if sarimax_flag is True:
+            try:
+                mdl_order = select_model_order(data_temp,
+                                               x13aspath,
+                                               'MS')
+                # here you can force the seasonal component to 0
+                ts_fcst = sarimax_model(data_temp,
+                                        seasonality_idx,
+                                        mdl_order,
+                                        fcst_window,
+                                        data_raw.index.min(),
+                                        data_raw.index.max(),
+                                        verbose,
+                                        data_raw_exog)
+                ts_fcst.loc[ts_fcst['Forecast'] < 0, 'Forecast'] = 0
+                y_pred = ts_fcst.loc[start_date:end_date].Forecast
+                print("{0} forecast with Seasonal ARIMA - Success".format(var))
+
+            except Exception:
+                y_pred = pd.Series()
+                print("{0} forecast with Seasonal ARIMA - Failure".format(var))
+                pass
+
+        # Gaussian Process model
+        elif gaussian_flag is True:
+            ts_fcst = decompose_model(data_temp,
+                                      fcst_window)
+            y_pred = ts_fcst.Total
+            print("{0} forecast with Gaussian process - Success".format(var))
+
+        # Facebook Prophet model
+        elif facebook_flag is True:
+            print(data_temp.index)
+            ts_fcst = facebook_model(data_temp,
+                                     fcst_window)
+            y_pred = ts_fcst.Total
+            print("{0} forecast with Facebook Prophet - Success".format(var))
+        else:
+            break
+
+        data_df[var] = y_pred
+
+    data_raw = data_raw.append(data_df)
+    data_raw.index.name = 'Date'
+    # save to file
+    data_raw.to_excel(writer, 'Metric - Forecast')
+    writer.save()
