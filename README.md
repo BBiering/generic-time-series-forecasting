@@ -1,4 +1,4 @@
-# Forecasting Wizard
+# Generic Time Series Forecasting
 
 **What's in the box?**
 
